@@ -6,8 +6,10 @@
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -76,7 +78,7 @@ static const Rectangle piece_combos[8][3] = {
 };
 
 typedef struct State {
-    Card grid[GRID_WIDTH][GRID_HEIGHT];
+    Card *grid;
     Texture2D texture;
     int revealed_count;
     int revealed_ids[3];
@@ -118,6 +120,17 @@ static RenderTexture2D target = { 0 };  // Render texture to render our game
 //----------------------------------------------------------------------------------
 static void update(void); // Update and Draw one frame
 
+void shuffle(Card *array, int n) {
+    if (n > 1) {
+        for (size_t i = n - 1; i > 0; i--) {
+            size_t j = (size_t)((double)rand() / ((double)RAND_MAX + 1) * (i + 1));
+            Card t = array[j];
+            array[j] = array[i];
+            array[i] = t;
+        }
+    }
+}
+
 static void draw_card(Card *card, Rectangle dst) {
     Vector2 origin = (Vector2){CARD_SIZE/2.0f, CARD_SIZE/2.0f};
     dst.x += origin.x;
@@ -129,21 +142,30 @@ static void draw_card(Card *card, Rectangle dst) {
         DrawTexturePro(state.texture, CARD_1, dst, origin, r, WHITE);
         DrawTexturePro(state.texture, card->texcoords, dst, origin, r, WHITE);
     }
-    /*DrawText(TextFormat("%d", card->combo_id), dst.x - origin.x, dst.y - origin.y, 20, BLACK);*/
+    DrawText(TextFormat("%d", card->combo_id), dst.x - origin.x, dst.y - origin.y, 20, BLACK);
     /*DrawText(TextFormat("%d", card->rotation), dst.x - origin.x, dst.y - origin.y + 25, 20, BLACK);*/
+    /*DrawText(TextFormat("%d", card->solved ? 1 : 0), dst.x - origin.x, dst.y - origin.y + 50, 20, BLACK);*/
+
 }
 
 static void init_grid() {
-    memset(state.grid, 0, sizeof(state.grid));
-    for (int x = 0; x < GRID_WIDTH; x++) {
-        for (int y = 0; y < GRID_HEIGHT; y++) {
-            Card *card = &state.grid[x][y];
 
-            int i = y * GRID_HEIGHT + x;
-            int piece = i % 3;
-            int rotation = (i / 3) % 4;
+    if (state.grid != NULL) {
+        free(state.grid);
+    }
+    state.grid = malloc(sizeof(Card) * GRID_WIDTH * GRID_HEIGHT);
+    memset(state.grid, 0, sizeof(Card) * GRID_WIDTH * GRID_HEIGHT);
+
+    for (int y = 0; y < GRID_HEIGHT; y++) {
+        for (int x = 0; x < GRID_WIDTH; x++) {
+            int i = y * GRID_WIDTH + x;
+            Card *card = &state.grid[i];
+
+            int p = y * GRID_HEIGHT + x;
+            int piece = p % 3;
+            int rotation = (p / 3) % 4;
             /*int combo = (rotation / 4) % 8;*/
-            int combo = (i / 12) % 3;
+            int combo = (p / 12) % 3;
             int combo_id = rotation * 8 + combo;
             card->texcoords = piece_combos[combo][piece];
             /*card->revealed = true;*/
@@ -151,6 +173,8 @@ static void init_grid() {
             card->combo_id = combo_id;
         }
     }
+
+    shuffle(state.grid, GRID_WIDTH * GRID_HEIGHT);
 }
 
 static void draw_grid() {
@@ -158,10 +182,11 @@ static void draw_grid() {
     Vector2 mouse = GetMousePosition();
 
     int padding = 2;
-    for (int x = 0; x < GRID_WIDTH; x++) {
-        for (int y = 0; y < GRID_HEIGHT; y++) {
+    for (int y = 0; y < GRID_HEIGHT; y++) {
+        for (int x = 0; x < GRID_WIDTH; x++) {
 
-            Card *card = &state.grid[x][y];
+            int i = y * GRID_WIDTH + x;
+            Card *card = &state.grid[i];
             float margin = (CARD_SPACING - CARD_SIZE) / 2.0f;
             Rectangle tex_rect = (Rectangle){x * CARD_SPACING + margin, y * CARD_SPACING + margin, CARD_SIZE, CARD_SIZE};
             Rectangle rect = (Rectangle){x * CARD_SPACING, y * CARD_SPACING, CARD_SPACING, CARD_SPACING};
@@ -199,7 +224,8 @@ static void draw_grid() {
                                 int j = state.revealed_ids[i];
                                 int xx = j % GRID_WIDTH;
                                 int yy = j / GRID_WIDTH;
-                                Card *c = &state.grid[xx][yy];
+                                int ii = yy * GRID_WIDTH + xx;
+                                Card *c = &state.grid[ii];
                                 c->revealed = false;
                                 if (combo_id == -1 || combo_id == c->combo_id) {
                                     combo_id = c->combo_id;
@@ -211,7 +237,8 @@ static void draw_grid() {
                                 int j = state.revealed_ids[i];
                                 int xx = j % GRID_WIDTH;
                                 int yy = j / GRID_WIDTH;
-                                Card *c = &state.grid[xx][yy];
+                                int ii = yy * GRID_WIDTH + xx;
+                                Card *c = &state.grid[ii];
                                 if (solved) {
                                     c->solved = true;
                                 }
@@ -238,6 +265,8 @@ int main(void) {
 #if !defined(_DEBUG)
     /*SetTraceLogLevel(LOG_NONE); // Disable raylib trace log messages*/
 #endif
+
+    srand(time(NULL));
 
     InitWindow(screen_width, screen_height, "raylib gamejam template");
     
