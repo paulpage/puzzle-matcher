@@ -83,6 +83,8 @@ typedef struct State {
     int revealed_count;
     int revealed_ids[3];
     int attempts;
+    Vector2 grid_offset;
+    bool reset_cards;
 } State;
 
 // TODO: Define your custom data types here
@@ -120,7 +122,7 @@ static RenderTexture2D target = { 0 };  // Render texture to render our game
 //----------------------------------------------------------------------------------
 static void update(void); // Update and Draw one frame
 
-void shuffle(Card *array, int n) {
+static void shuffle(Card *array, int n) {
     if (n > 1) {
         for (size_t i = n - 1; i > 0; i--) {
             size_t j = (size_t)((double)rand() / ((double)RAND_MAX + 1) * (i + 1));
@@ -135,7 +137,20 @@ static void draw_card(Card *card, Rectangle dst) {
     Vector2 origin = (Vector2){CARD_SIZE/2.0f, CARD_SIZE/2.0f};
     dst.x += origin.x;
     dst.y += origin.y;
+    dst.x += state.grid_offset.x;
+    dst.y += state.grid_offset.y;
     float r = (float)card->rotation * 90.0f;
+
+    if (card->hovered) {
+        Rectangle hover_rect = (Rectangle){
+            dst.x - origin.x - 2.0f,
+            dst.y - origin.y - 2.0f,
+            dst.width + 4.0f,
+            dst.height + 5.0f,
+        };
+        DrawRectangleRec(hover_rect, BLACK);
+    }
+
     if (!card->revealed && !card->solved) {
         DrawTexturePro(state.texture, CARD_0, dst, origin, r, WHITE);
     } else {
@@ -177,9 +192,62 @@ static void init_grid() {
     shuffle(state.grid, GRID_WIDTH * GRID_HEIGHT);
 }
 
+static void reset_cards() {
+    for (int i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
+        state.grid[i].hovered = false;
+        state.grid[i].active = false;
+        state.grid[i].revealed = false;
+    }
+    state.revealed_count = 0;
+}
+
+static void check_solve() {
+
+    int guesses[3];
+    int guess_count = 0;
+
+    for (int i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
+        if (state.grid[i].revealed) {
+            guesses[guess_count] = i;
+            guess_count++;
+            if (guess_count > 3) {
+                LOG("ERROR: More than 3 guesses!");
+                return;
+            }
+        }
+    }
+
+    bool all_match = true;
+    for (int i = 0; i < 3; i++) {
+        if (state.grid[guesses[i]].combo_id != state.grid[guesses[0]].combo_id) {
+            all_match = false;
+        }
+    }
+
+    if (all_match) {
+        for (int i = 0; i < 3; i++) {
+            state.grid[guesses[i]].solved = true;
+        }
+    }
+}
+
 static void draw_grid() {
 
     Vector2 mouse = GetMousePosition();
+
+
+    bool in_revealed = false;
+    if (state.revealed_count >= 3 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        in_revealed = true;
+        if (state.reset_cards) {
+            reset_cards();
+        } else {
+            check_solve();
+            state.reset_cards = true;
+        }
+    }
+
+
 
     int padding = 2;
     for (int y = 0; y < GRID_HEIGHT; y++) {
@@ -188,73 +256,27 @@ static void draw_grid() {
             int i = y * GRID_WIDTH + x;
             Card *card = &state.grid[i];
             float margin = (CARD_SPACING - CARD_SIZE) / 2.0f;
+            Rectangle rect = (Rectangle){x * CARD_SPACING + state.grid_offset.x, y * CARD_SPACING + state.grid_offset.y, CARD_SPACING, CARD_SPACING};
             Rectangle tex_rect = (Rectangle){x * CARD_SPACING + margin, y * CARD_SPACING + margin, CARD_SIZE, CARD_SIZE};
-            Rectangle rect = (Rectangle){x * CARD_SPACING, y * CARD_SPACING, CARD_SPACING, CARD_SPACING};
 
-            draw_card(card, tex_rect);
-
-            /*float margin = CARD_SPACING;*/
-            /**/
-            /*Rectangle drawing_rect = (Rectangle){*/
-            /*    x * CARD_SIZE + padding,*/
-            /*    y * CARD_SIZE + padding,*/
-            /*    CARD_SIZE - 2*padding,*/
-            /*    CARD_SIZE - 2*padding,*/
-            /*};*/
-            /**/
-            /**/
             if (CheckCollisionPointRec(mouse, rect)) {
                 if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
                     card->active = true;
                 } else {
                     card->hovered = true;
                 }
-
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-                    if (card->active) {
-                        card->revealed = !(card->revealed);
-                        card->active = false;
-                        state.revealed_ids[state.revealed_count] = y * GRID_WIDTH + x;
-                        state.revealed_count++;
-
-                        if (state.revealed_count >= 3) {
-                            int combo_id = -1;
-                            bool solved = true;
-                            for (int i = 0; i < 3; i++) {
-                                int j = state.revealed_ids[i];
-                                int xx = j % GRID_WIDTH;
-                                int yy = j / GRID_WIDTH;
-                                int ii = yy * GRID_WIDTH + xx;
-                                Card *c = &state.grid[ii];
-                                c->revealed = false;
-                                if (combo_id == -1 || combo_id == c->combo_id) {
-                                    combo_id = c->combo_id;
-                                } else {
-                                    solved = false;
-                                }
-                            }
-                            for (int i = 0; i < 3; i++) {
-                                int j = state.revealed_ids[i];
-                                int xx = j % GRID_WIDTH;
-                                int yy = j / GRID_WIDTH;
-                                int ii = yy * GRID_WIDTH + xx;
-                                Card *c = &state.grid[ii];
-                                if (solved) {
-                                    c->solved = true;
-                                }
-                            }
-                            state.attempts++;
-                            state.revealed_count = 0;
-                        }
-
-                    }
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && card->active && !card->revealed && !in_revealed) {
+                    card->revealed = true;
+                    card->active = false;
+                    state.revealed_ids[state.revealed_count] = y * GRID_WIDTH + x;
+                    state.revealed_count++;
                 }
             } else {
                 card->hovered = false;
                 card->active = false;
             }
 
-            /*DrawRectangleRec(drawing_rect, color);*/
+            draw_card(card, tex_rect);
         }
     }
 
@@ -273,6 +295,10 @@ int main(void) {
     // TODO: Load resources / Initialize variables at this point
     state.texture = LoadTexture("resources/puzzle.png");
     init_grid();
+
+    state.grid_offset = (Vector2){350.0f, 10.0f};
+    state.grid_offset.y = (float)(screen_height - GRID_HEIGHT * CARD_SPACING) / 2.0f;
+    state.grid_offset.x = (float)(screen_width - GRID_WIDTH * CARD_SPACING - state.grid_offset.y);
     
     
     // Render texture to draw full screen, enables screen scaling
