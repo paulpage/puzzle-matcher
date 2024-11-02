@@ -37,7 +37,7 @@ typedef struct Card {
     Rectangle texcoords;
     int rotation;
     int combo_id;
-    bool hovered, active, revealed, solved;
+    bool hovered, revealed, solved, wrong;
 } Card;
 
 #define GRID_WIDTH 6
@@ -133,14 +133,19 @@ static void draw_card(Card *card, Rectangle dst) {
     dst.y += state.grid_offset.y;
     float r = (float)card->rotation * 90.0f;
 
-    if (card->hovered) {
-        Rectangle hover_rect = (Rectangle){
-            dst.x - origin.x - 2.0f,
+    Rectangle hover_rect = (Rectangle){
+        dst.x - origin.x - 2.0f,
             dst.y - origin.y - 2.0f,
             dst.width + 4.0f,
             dst.height + 5.0f,
-        };
-        DrawRectangleRec(hover_rect, BLACK);
+    };
+
+    if (card->solved) {
+        DrawRectangleRec(hover_rect, colors[3]);
+    } else if (card->wrong) {
+        DrawRectangleRec(hover_rect, colors[2]);
+    } else if (card->hovered) {
+        DrawRectangleRec(hover_rect, colors[1]);
     }
 
     if (!card->revealed && !card->solved) {
@@ -149,7 +154,8 @@ static void draw_card(Card *card, Rectangle dst) {
         DrawTexturePro(state.texture, CARD_1, dst, origin, r, WHITE);
         DrawTexturePro(state.texture, card->texcoords, dst, origin, r, WHITE);
     }
-    DrawText(TextFormat("%d", card->combo_id), dst.x - origin.x, dst.y - origin.y, 20, BLACK);
+
+    /*DrawText(TextFormat("%d", card->combo_id), dst.x - origin.x, dst.y - origin.y, 20, BLACK);*/
     /*DrawText(TextFormat("%d", card->rotation), dst.x - origin.x, dst.y - origin.y + 25, 20, BLACK);*/
     /*DrawText(TextFormat("%d", card->solved ? 1 : 0), dst.x - origin.x, dst.y - origin.y + 50, 20, BLACK);*/
 
@@ -227,13 +233,13 @@ static void init_grid() {
 static void reset_cards() {
     for (int i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
         state.grid[i].hovered = false;
-        state.grid[i].active = false;
         state.grid[i].revealed = false;
+        state.grid[i].wrong = false;
     }
     state.revealed_count = 0;
 }
 
-static void check_solve() {
+static bool check_solve() {
 
     int guesses[3];
     int guess_count = 0;
@@ -260,26 +266,27 @@ static void check_solve() {
         for (int i = 0; i < 3; i++) {
             state.grid[guesses[i]].solved = true;
         }
+    } else {
+        for (int i = 0; i < 3; i++) {
+            state.grid[guesses[i]].wrong = true;
+        }
     }
+
+    return all_match;
 }
 
 static void draw_grid() {
 
     Vector2 mouse = GetMousePosition();
 
-
     bool in_revealed = false;
-    if (state.revealed_count >= 3 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    if (state.revealed_count >= 3) {
         in_revealed = true;
-        if (state.reset_cards) {
+        bool solved = check_solve();
+        if (solved || IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             reset_cards();
-        } else {
-            check_solve();
-            state.reset_cards = true;
         }
     }
-
-
 
     int padding = 2;
     for (int y = 0; y < GRID_HEIGHT; y++) {
@@ -292,20 +299,17 @@ static void draw_grid() {
             Rectangle tex_rect = (Rectangle){x * CARD_SPACING + margin, y * CARD_SPACING + margin, CARD_SIZE, CARD_SIZE};
 
             if (CheckCollisionPointRec(mouse, rect)) {
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-                    card->active = true;
-                } else {
-                    card->hovered = true;
-                }
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && card->active && !card->revealed && !in_revealed) {
+                card->hovered = true;
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !card->revealed && !in_revealed) {
                     card->revealed = true;
-                    card->active = false;
                     state.revealed_ids[state.revealed_count] = y * GRID_WIDTH + x;
+                    if (state.revealed_count == 0) {
+                        state.attempts++;
+                    }
                     state.revealed_count++;
                 }
             } else {
                 card->hovered = false;
-                card->active = false;
             }
 
             draw_card(card, tex_rect);
