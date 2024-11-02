@@ -66,19 +66,20 @@ static const float CARD_SIZE = 64.0f;
 #define CARD_0      ((Rectangle){ SCL*2, SCL*2, SCL, SCL})
 #define CARD_1      ((Rectangle){ SCL*3, SCL*2, SCL, SCL})
 
-static const Rectangle piece_combos[8][3] = {
-    {PIECE_LG_00, PIECE_MD_10, PIECE_SM_11},
-    {PIECE_LG_00, PIECE_MD_11, PIECE_SM_10},
-    {PIECE_LG_01, PIECE_MD_00, PIECE_SM_11},
-    {PIECE_LG_01, PIECE_MD_01, PIECE_SM_01},
-    {PIECE_LG_10, PIECE_MD_10, PIECE_SM_10},
-    {PIECE_LG_10, PIECE_MD_11, PIECE_SM_00},
-    {PIECE_LG_11, PIECE_MD_00, PIECE_SM_10},
-    {PIECE_LG_11, PIECE_MD_01, PIECE_SM_00},
-};
+/*static const Rectangle piece_combos[8][3] = {*/
+/*    {PIECE_LG_00, PIECE_MD_10, PIECE_SM_11},*/
+/*    {PIECE_LG_00, PIECE_MD_11, PIECE_SM_10},*/
+/*    {PIECE_LG_01, PIECE_MD_00, PIECE_SM_11},*/
+/*    {PIECE_LG_01, PIECE_MD_01, PIECE_SM_01},*/
+/*    {PIECE_LG_10, PIECE_MD_10, PIECE_SM_10},*/
+/*    {PIECE_LG_10, PIECE_MD_11, PIECE_SM_00},*/
+/*    {PIECE_LG_11, PIECE_MD_00, PIECE_SM_10},*/
+/*    {PIECE_LG_11, PIECE_MD_01, PIECE_SM_00},*/
+/*};*/
 
 typedef struct State {
     Card *grid;
+    Rectangle *piece_combos;
     Texture2D texture;
     int revealed_count;
     int revealed_ids[3];
@@ -100,16 +101,7 @@ static const int screen_height = 450;
 /*};*/
 
 #define MAX_COLORS 8
-static const Color colors[MAX_COLORS] = {
-    WHITE,
-    BLACK,
-    MAROON,
-    DARKGREEN,
-    GOLD,
-    DARKBLUE,
-    DARKPURPLE,
-    MAGENTA,
-};
+static Color colors[MAX_COLORS];
 
 static State state = {0};
 
@@ -171,6 +163,45 @@ static void init_grid() {
     state.grid = malloc(sizeof(Card) * GRID_WIDTH * GRID_HEIGHT);
     memset(state.grid, 0, sizeof(Card) * GRID_WIDTH * GRID_HEIGHT);
 
+    if (state.piece_combos != NULL) {
+        free(state.piece_combos);
+    }
+    state.piece_combos = malloc(sizeof(Rectangle) * 8 * 3);
+    state.piece_combos[0] = PIECE_LG_00;
+    state.piece_combos[1] = PIECE_MD_10;
+    state.piece_combos[2] = PIECE_SM_11;
+    state.piece_combos[3] = PIECE_LG_00;
+    state.piece_combos[4] = PIECE_MD_11;
+    state.piece_combos[5] = PIECE_SM_10;
+    state.piece_combos[6] = PIECE_LG_01;
+    state.piece_combos[7] = PIECE_MD_00;
+    state.piece_combos[8] = PIECE_SM_11;
+    state.piece_combos[9] = PIECE_LG_01;
+    state.piece_combos[10] = PIECE_MD_01;
+    state.piece_combos[11] = PIECE_SM_01;
+    state.piece_combos[12] = PIECE_LG_10;
+    state.piece_combos[13] = PIECE_MD_10;
+    state.piece_combos[14] = PIECE_SM_10;
+    state.piece_combos[15] = PIECE_LG_10;
+    state.piece_combos[16] = PIECE_MD_11;
+    state.piece_combos[17] = PIECE_SM_00;
+    state.piece_combos[18] = PIECE_LG_11;
+    state.piece_combos[19] = PIECE_MD_00;
+    state.piece_combos[20] = PIECE_SM_10;
+    state.piece_combos[21] = PIECE_LG_11;
+    state.piece_combos[22] = PIECE_MD_01;
+    state.piece_combos[23] = PIECE_SM_00;
+
+
+    colors[0] = WHITE;
+    colors[1] = BLACK;
+    colors[2] = MAROON;
+    colors[3] = DARKGREEN;
+    colors[4] = GOLD;
+    colors[5] = DARKBLUE;
+    colors[6] = DARKPURPLE;
+    colors[7] = MAGENTA;
+
     for (int y = 0; y < GRID_HEIGHT; y++) {
         for (int x = 0; x < GRID_WIDTH; x++) {
             int i = y * GRID_WIDTH + x;
@@ -182,7 +213,8 @@ static void init_grid() {
             /*int combo = (rotation / 4) % 8;*/
             int combo = (p / 12) % 3;
             int combo_id = rotation * 8 + combo;
-            card->texcoords = piece_combos[combo][piece];
+            int ii = combo * 3 + piece;
+            card->texcoords = state.piece_combos[ii];
             /*card->revealed = true;*/
             card->rotation = rotation;
             card->combo_id = combo_id;
