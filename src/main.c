@@ -40,14 +40,36 @@ typedef struct Card {
     bool hovered, revealed, solved, wrong;
 } Card;
 
-#define GRID_WIDTH 6
-#define GRID_HEIGHT 6
-#define CARD_COUNT 36
-
-static const float CARD_SPACING = 72.0f;
-static const float CARD_SIZE = 64.0f;
+typedef struct State {
+    Card *grid;
+    Rectangle *piece_combos;
+    Texture2D texture;
+    int revealed_count;
+    int revealed_ids[3];
+    int attempts;
+    Vector2 grid_offset;
+    bool reset_cards;
+    int grid_width;
+    int grid_height;
+    int card_count;
+    float card_spacing;
+    float card_size;
+} State;
 
 // Includes padding; card texture will have a blank border
+
+//----------------------------------------------------------------------------------
+// Global Variables Definition
+//----------------------------------------------------------------------------------
+static const int screen_width = 800;
+static const int screen_height = 450;
+
+#define MAX_COLORS 8
+static Color colors[MAX_COLORS];
+
+static State state = {0};
+
+static RenderTexture2D target = { 0 };  // Render texture to render our game
 
 // Texture coordinates
 #define SCL 32
@@ -66,49 +88,6 @@ static const float CARD_SIZE = 64.0f;
 #define CARD_0      ((Rectangle){ SCL*2, SCL*2, SCL, SCL})
 #define CARD_1      ((Rectangle){ SCL*3, SCL*2, SCL, SCL})
 
-/*static const Rectangle piece_combos[8][3] = {*/
-/*    {PIECE_LG_00, PIECE_MD_10, PIECE_SM_11},*/
-/*    {PIECE_LG_00, PIECE_MD_11, PIECE_SM_10},*/
-/*    {PIECE_LG_01, PIECE_MD_00, PIECE_SM_11},*/
-/*    {PIECE_LG_01, PIECE_MD_01, PIECE_SM_01},*/
-/*    {PIECE_LG_10, PIECE_MD_10, PIECE_SM_10},*/
-/*    {PIECE_LG_10, PIECE_MD_11, PIECE_SM_00},*/
-/*    {PIECE_LG_11, PIECE_MD_00, PIECE_SM_10},*/
-/*    {PIECE_LG_11, PIECE_MD_01, PIECE_SM_00},*/
-/*};*/
-
-typedef struct State {
-    Card *grid;
-    Rectangle *piece_combos;
-    Texture2D texture;
-    int revealed_count;
-    int revealed_ids[3];
-    int attempts;
-    Vector2 grid_offset;
-    bool reset_cards;
-} State;
-
-// TODO: Define your custom data types here
-
-//----------------------------------------------------------------------------------
-// Global Variables Definition
-//----------------------------------------------------------------------------------
-static const int screen_width = 800;
-static const int screen_height = 450;
-
-/*static const Color cards[CARD_COUNT] = {*/
-/**/
-/*};*/
-
-#define MAX_COLORS 8
-static Color colors[MAX_COLORS];
-
-static State state = {0};
-
-static RenderTexture2D target = { 0 };  // Render texture to render our game
-
-// TODO: Define global variables here, recommended to make them static
-
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
@@ -126,7 +105,7 @@ static void shuffle(Card *array, int n) {
 }
 
 static void draw_card(Card *card, Rectangle dst) {
-    Vector2 origin = (Vector2){CARD_SIZE/2.0f, CARD_SIZE/2.0f};
+    Vector2 origin = (Vector2){state.card_size/2.0f, state.card_size/2.0f};
     dst.x += origin.x;
     dst.y += origin.y;
     dst.x += state.grid_offset.x;
@@ -161,17 +140,26 @@ static void draw_card(Card *card, Rectangle dst) {
 
 }
 
-static void init_grid() {
+static void init_grid(int grid_width, int grid_height) {
+
+    state.grid_width = grid_width;
+    state.grid_height = grid_height;
+    state.card_size = (float)((screen_height - 10) /  grid_height / 32 * 32);
+    state.card_spacing = state.card_size + state.card_size / 8.0f;
+    state.grid_offset.y = (float)(screen_height - state.grid_height * state.card_spacing) / 2.0f;
+    state.grid_offset.x = (float)(screen_width - state.grid_width * state.card_spacing - state.grid_offset.y); // TODO revisit for rectangular boards
+    state.card_count = state.grid_width * state.grid_height;
 
     if (state.grid != NULL) {
         free(state.grid);
     }
-    state.grid = malloc(sizeof(Card) * GRID_WIDTH * GRID_HEIGHT);
-    memset(state.grid, 0, sizeof(Card) * GRID_WIDTH * GRID_HEIGHT);
+    state.grid = malloc(sizeof(Card) * state.card_count);
+    memset(state.grid, 0, sizeof(Card) * state.card_count);
 
     if (state.piece_combos != NULL) {
         free(state.piece_combos);
     }
+
     state.piece_combos = malloc(sizeof(Rectangle) * 8 * 3);
     state.piece_combos[0] = PIECE_LG_00;
     state.piece_combos[1] = PIECE_MD_10;
@@ -197,8 +185,9 @@ static void init_grid() {
     state.piece_combos[21] = PIECE_LG_11;
     state.piece_combos[22] = PIECE_MD_01;
     state.piece_combos[23] = PIECE_SM_00;
+    // TODO more combos for bigger boards. (What's the max board size?)
 
-
+    // TODO we're not using all of these, enforce color pallette
     colors[0] = WHITE;
     colors[1] = BLACK;
     colors[2] = MAROON;
@@ -208,30 +197,28 @@ static void init_grid() {
     colors[6] = DARKPURPLE;
     colors[7] = MAGENTA;
 
-    for (int y = 0; y < GRID_HEIGHT; y++) {
-        for (int x = 0; x < GRID_WIDTH; x++) {
-            int i = y * GRID_WIDTH + x;
+    for (int y = 0; y < state.grid_height; y++) {
+        for (int x = 0; x < state.grid_width; x++) {
+            int i = y * state.grid_width + x;
             Card *card = &state.grid[i];
 
-            int p = y * GRID_HEIGHT + x;
+            int p = y * state.grid_width + x;
             int piece = p % 3;
             int rotation = (p / 3) % 4;
-            /*int combo = (rotation / 4) % 8;*/
             int combo = (p / 12) % 3;
             int combo_id = rotation * 8 + combo;
             int ii = combo * 3 + piece;
             card->texcoords = state.piece_combos[ii];
-            /*card->revealed = true;*/
             card->rotation = rotation;
             card->combo_id = combo_id;
         }
     }
 
-    shuffle(state.grid, GRID_WIDTH * GRID_HEIGHT);
+    shuffle(state.grid, state.card_count);
 }
 
 static void reset_cards() {
-    for (int i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
+    for (int i = 0; i < state.card_count; i++) {
         state.grid[i].hovered = false;
         state.grid[i].revealed = false;
         state.grid[i].wrong = false;
@@ -244,7 +231,7 @@ static bool check_solve() {
     int guesses[3];
     int guess_count = 0;
 
-    for (int i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
+    for (int i = 0; i < state.card_count; i++) {
         if (state.grid[i].revealed) {
             guesses[guess_count] = i;
             guess_count++;
@@ -289,20 +276,20 @@ static void draw_grid() {
     }
 
     int padding = 2;
-    for (int y = 0; y < GRID_HEIGHT; y++) {
-        for (int x = 0; x < GRID_WIDTH; x++) {
+    for (int y = 0; y < state.grid_width; y++) {
+        for (int x = 0; x < state.grid_height; x++) {
 
-            int i = y * GRID_WIDTH + x;
+            int i = y * state.grid_width + x;
             Card *card = &state.grid[i];
-            float margin = (CARD_SPACING - CARD_SIZE) / 2.0f;
-            Rectangle rect = (Rectangle){x * CARD_SPACING + state.grid_offset.x, y * CARD_SPACING + state.grid_offset.y, CARD_SPACING, CARD_SPACING};
-            Rectangle tex_rect = (Rectangle){x * CARD_SPACING + margin, y * CARD_SPACING + margin, CARD_SIZE, CARD_SIZE};
+            float margin = (state.card_spacing - state.card_size) / 2.0f;
+            Rectangle rect = (Rectangle){x * state.card_spacing + state.grid_offset.x, y * state.card_spacing + state.grid_offset.y, state.card_spacing, state.card_spacing};
+            Rectangle tex_rect = (Rectangle){x * state.card_spacing + margin, y * state.card_spacing + margin, state.card_size, state.card_size};
 
             if (CheckCollisionPointRec(mouse, rect)) {
                 card->hovered = true;
                 if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !card->revealed && !in_revealed) {
                     card->revealed = true;
-                    state.revealed_ids[state.revealed_count] = y * GRID_WIDTH + x;
+                    state.revealed_ids[state.revealed_count] = i;
                     if (state.revealed_count == 0) {
                         state.attempts++;
                     }
@@ -326,15 +313,12 @@ int main(void) {
 
     srand(time(NULL));
 
-    InitWindow(screen_width, screen_height, "raylib gamejam template");
+    InitWindow(screen_width, screen_height, "Puzzle Matcher");
     
     // TODO: Load resources / Initialize variables at this point
     state.texture = LoadTexture("resources/puzzle.png");
-    init_grid();
+    init_grid(3, 3);
 
-    state.grid_offset = (Vector2){350.0f, 10.0f};
-    state.grid_offset.y = (float)(screen_height - GRID_HEIGHT * CARD_SPACING) / 2.0f;
-    state.grid_offset.x = (float)(screen_width - GRID_WIDTH * CARD_SPACING - state.grid_offset.y);
     
     
     // Render texture to draw full screen, enables screen scaling
@@ -384,6 +368,19 @@ void update(void) {
     BeginTextureMode(target);
 
     ClearBackground(GRAY);
+
+    if (IsKeyPressed(KEY_UP) && state.grid_height < 12) {
+        init_grid(state.grid_width, state.grid_height + 1);
+    }
+    if (IsKeyPressed(KEY_DOWN) && state.grid_height > 1) {
+        init_grid(state.grid_width, state.grid_height - 1);
+    }
+    if (IsKeyPressed(KEY_LEFT) && state.grid_width > 1) {
+        init_grid(state.grid_width - 1, state.grid_height);
+    }
+    if (IsKeyPressed(KEY_RIGHT) && state.grid_width < 12) {
+        init_grid(state.grid_width + 1, state.grid_height);
+    }
 
     draw_grid();
     float texw = (float)state.texture.width;
