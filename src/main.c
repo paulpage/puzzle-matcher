@@ -188,12 +188,8 @@ static bool check_solve() {
 
     int guesses[3];
     int guess_count = 0;
-    state.has_won = true;
 
     for (int i = 0; i < state.card_count; i++) {
-        if (!state.grid[i].solved) {
-            state.has_won = false;
-        }
         if (state.grid[i].revealed) {
             guesses[guess_count] = i;
             guess_count++;
@@ -221,6 +217,13 @@ static bool check_solve() {
             for (int i = 0; i < 3; i++) {
                 state.grid[guesses[i]].wrong = true;
             }
+        }
+    }
+
+    state.has_won = true;
+    for (int i = 0; i < state.card_count; i++) {
+        if (!state.grid[i].solved) {
+            state.has_won = false;
         }
     }
 
@@ -469,7 +472,7 @@ static void draw_grid() {
 
             if (CheckCollisionPointRec(mouse, rect)) {
                 card->hovered = true;
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !card->revealed && !in_revealed) {
+                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !card->solved && !card->revealed && !in_revealed) {
                     card->revealed = true;
                     state.revealed_ids[state.revealed_count] = i;
                     if (state.revealed_count == 0) {
