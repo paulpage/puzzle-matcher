@@ -24,9 +24,7 @@ TODO
 
 ### Links
 
- - YouTube Gameplay: TODO
- - itch.io Release: TODO
- - Steam Release: TODO
+ - itch.io Release: [https://paulpage.itch.io/puzzle-matcher](https://paulpage.itch.io/puzzle-matcher)
 
 ### License
 
