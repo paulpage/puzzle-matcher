@@ -23,6 +23,9 @@
     #define LOG(...)
 #endif
 
+#define min(a,b) (((a)<(b))?(a):(b))
+#define max(a,b) (((a)>(b))?(a):(b))
+
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
@@ -43,8 +46,6 @@ typedef struct Card {
 typedef struct State {
     Card *grid;
     Rectangle *piece_combos;
-    Texture2D texture;
-    Texture2D texture_text;
     int revealed_count;
     int revealed_ids[3];
     int attempts;
@@ -55,6 +56,8 @@ typedef struct State {
     int card_count;
     float card_spacing;
     float card_size;
+    bool showing_new_buttons;
+    bool has_won;
 } State;
 
 // Includes padding; card texture will have a blank border
@@ -66,12 +69,18 @@ static const int screen_width = 800;
 static const int screen_height = 450;
 static const float menu_width = 350.0f;
 
-#define MAX_COLORS 8
-static Color colors[MAX_COLORS];
+#define COLOR_BG ((Color){0x9b, 0x99, 0xb6, 0xff})
+#define COLOR_DARK ((Color){0x1b, 0x20, 0x1f, 0xff})
+#define COLOR_LIGHT ((Color){0x1f, 0xc1, 0x65, 0xff})
+#define COLOR_RED ((Color){0xc9, 0x29, 0x6e, 0xff})
+#define COLOR_CARD_DARK ((Color){0xd9, 0xa0, 0x66, 0xff})
+#define COLOR_CARD_LIGHT ((Color){0x32, 0x3c, 0x39, 0xff})
+#define COLOR_PUZ_DARK ((Color){0x5b, 0x6e, 0xe1, 0xff})
+#define COLOR_PUZ_LIGHT ((Color){0x63, 0x9b, 0xff, 0xff})
 
 static State state = {0};
 static Texture2D texture;
-static Texture2D texture_text;
+static Font font;
 
 static RenderTexture2D target = { 0 };  // Render texture to render our game
 
@@ -92,6 +101,10 @@ static RenderTexture2D target = { 0 };  // Render texture to render our game
 #define CARD_0      ((Rectangle){ SCL*2, SCL*2, SCL, SCL})
 #define CARD_1      ((Rectangle){ SCL*3, SCL*2, SCL, SCL})
 
+#define BORDER_CORNER ((Rectangle){64, 96, 12, 12})
+#define BORDER_X ((Rectangle){76, 96, 4, 12})
+#define BORDER_Y ((Rectangle){64, 108, 12, 4})
+
 #define TITLE ((Rectangle){ 0, 0, 79, 39 })
 #define ATTEMPTS ((Rectangle){ 0, 40, 84, 24 })
 #define NEW ((Rectangle){ 0, 110, 37, 18 })
@@ -110,56 +123,17 @@ static RenderTexture2D target = { 0 };  // Render texture to render our game
 #define TEXT_HEIGHT 23
 #define NUM_HEIGHT 16
 
+typedef enum Alignment {
+    ALIGN_START,
+    ALIGN_MID,
+    ALIGN_END,
+} Alignment;
+
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 static void update(void); // Update and Draw one frame
 
-
-void draw_text_texture(Rectangle src, Vector2 pos, float scale, bool center_x, bool center_y) {
-    Rectangle dst;
-    dst.x = pos.x;
-    dst.y = pos.y;
-    dst.width = src.width * scale;
-    dst.height = src.height * scale;
-    Vector2 origin = {0, 0};
-    if (center_x) {
-        origin.x = src.width / 2.0f;
-    }
-    if (center_y) {
-        origin.y = src.height / 2.0f;
-    }
-    DrawTexturePro(texture_text, src, dst, origin, 0.0f, WHITE);
-}
-
-void draw_number(int number, Vector2 pos, float scale) {
-    char str[32];
-    sprintf(str, "%d", number);
-    
-    float advance = 0;
-    
-    for (int i = 0; str[i] != '\0'; i++) {
-        int digit = str[i] - '0';
-        Rectangle src;
-        
-        switch (digit) {
-            case 0: src = NUM_0; break;
-            case 1: src = NUM_1; break;
-            case 2: src = NUM_2; break;
-            case 3: src = NUM_3; break;
-            case 4: src = NUM_4; break;
-            case 5: src = NUM_5; break;
-            case 6: src = NUM_6; break;
-            case 7: src = NUM_7; break;
-            case 8: src = NUM_8; break;
-            case 9: src = NUM_9; break;
-            default: continue; // Skip non-digit characters
-        }
-        
-        draw_text_texture(src, (Vector2){pos.x + advance, pos.y}, scale, false, false);
-        advance += src.width * scale;
-    }
-}
 
 static void shuffle(Card *array, int n) {
     if (n > 1) {
@@ -180,19 +154,20 @@ static void draw_card(Card *card, Rectangle dst) {
     dst.y += state.grid_offset.y;
     float r = (float)card->rotation * 90.0f;
 
+    float border = state.card_size / 32.0f;
     Rectangle hover_rect = (Rectangle){
-        dst.x - origin.x - 2.0f,
-            dst.y - origin.y - 2.0f,
-            dst.width + 4.0f,
-            dst.height + 5.0f,
+        dst.x - origin.x - border,
+            dst.y - origin.y - border,
+            dst.width + border * 2.0f,
+            dst.height + border * 2.0f,
     };
 
     if (card->solved) {
-        DrawRectangleRec(hover_rect, colors[3]);
+        DrawRectangleRec(hover_rect, COLOR_LIGHT);
     } else if (card->wrong) {
-        DrawRectangleRec(hover_rect, colors[2]);
+        DrawRectangleRec(hover_rect, COLOR_RED);
     } else if (card->hovered) {
-        DrawRectangleRec(hover_rect, colors[1]);
+        DrawRectangleRec(hover_rect, COLOR_DARK);
     }
 
     if (!card->revealed && !card->solved) {
@@ -202,11 +177,55 @@ static void draw_card(Card *card, Rectangle dst) {
         DrawTexturePro(texture, card->texcoords, dst, origin, r, WHITE);
     }
 
-    /*DrawText(TextFormat("%d", card->combo_id), dst.x - origin.x, dst.y - origin.y, 20, BLACK);*/
-    /*DrawText(TextFormat("%d", card->rotation), dst.x - origin.x, dst.y - origin.y + 25, 20, BLACK);*/
-    /*DrawText(TextFormat("%d", card->solved ? 1 : 0), dst.x - origin.x, dst.y - origin.y + 50, 20, BLACK);*/
+    /*DrawTextEx(font, TextFormat("%d", card->combo_id), (Vector2){dst.x - origin.x, dst.y - origin.y}, 16, 0, COLOR_DARK);*/
+    /*DrawTextEx(font, TextFormat("%d", card->rotation), (Vector2){dst.x - origin.x, dst.y - origin.y + 25}, 16, 0, COLOR_DARK);*/
+    /*DrawTextEx(font, TextFormat("%d", card->solved ? 1 : 0), (Vector2){dst.x - origin.x, dst.y - origin.y + 50}, 16, 0, COLOR_DARK);*/
 
 }
+
+static bool check_solve() {
+
+    int guesses[3];
+    int guess_count = 0;
+    state.has_won = true;
+
+    for (int i = 0; i < state.card_count; i++) {
+        if (!state.grid[i].solved) {
+            state.has_won = false;
+        }
+        if (state.grid[i].revealed) {
+            guesses[guess_count] = i;
+            guess_count++;
+            if (guess_count > 3) {
+                LOG("ERROR: More than 3 guesses!");
+                return false;
+            }
+        }
+    }
+
+    bool all_match = false;
+    if (guess_count == 3) {
+        all_match = true;
+        for (int i = 0; i < 3; i++) {
+            if (state.grid[guesses[i]].combo_id != state.grid[guesses[0]].combo_id) {
+                all_match = false;
+            }
+        }
+
+        if (all_match) {
+            for (int i = 0; i < 3; i++) {
+                state.grid[guesses[i]].solved = true;
+            }
+        } else {
+            for (int i = 0; i < 3; i++) {
+                state.grid[guesses[i]].wrong = true;
+            }
+        }
+    }
+
+    return all_match;
+}
+
 
 static void init_grid(int grid_width, int grid_height) {
 
@@ -214,10 +233,15 @@ static void init_grid(int grid_width, int grid_height) {
 
     state.grid_width = grid_width;
     state.grid_height = grid_height;
-    state.card_size = (float)((screen_height - 10) /  grid_height / 32 * 32);
+
+    state.card_size = min(
+        (float)((screen_height - 10) / grid_height / 32 * 32),
+        (float)((screen_height - 10) / grid_width / 32 * 32), // yes, screen_height
+    );
+
     state.card_spacing = state.card_size + state.card_size / 8.0f;
     state.grid_offset.y = (float)(screen_height - state.grid_height * state.card_spacing) / 2.0f;
-    state.grid_offset.x = (float)(screen_width - state.grid_width * state.card_spacing - state.grid_offset.y); // TODO revisit for rectangular boards
+    state.grid_offset.x = (float)(screen_width - state.grid_width * state.card_spacing - 10);
     state.card_count = state.grid_width * state.grid_height;
 
     if (state.grid != NULL) {
@@ -257,16 +281,6 @@ static void init_grid(int grid_width, int grid_height) {
     state.piece_combos[23] = PIECE_SM_00;
     // TODO more combos for bigger boards. (What's the max board size?)
 
-    // TODO we're not using all of these, enforce color pallette
-    colors[0] = WHITE;
-    colors[1] = BLACK;
-    colors[2] = MAROON;
-    colors[3] = DARKGREEN;
-    colors[4] = GOLD;
-    colors[5] = DARKBLUE;
-    colors[6] = DARKPURPLE;
-    colors[7] = MAGENTA;
-
     for (int y = 0; y < state.grid_height; y++) {
         for (int x = 0; x < state.grid_width; x++) {
             int i = y * state.grid_width + x;
@@ -284,6 +298,11 @@ static void init_grid(int grid_width, int grid_height) {
     }
 
     shuffle(state.grid, state.card_count);
+
+    /*for (int i = 0; i < state.card_count; i++) {*/
+    /*    state.grid[i].solved = true;*/
+    /*}*/
+    /*check_solve();*/
 }
 
 static void reset_cards() {
@@ -295,44 +314,134 @@ static void reset_cards() {
     state.revealed_count = 0;
 }
 
-static bool check_solve() {
-
-    int guesses[3];
-    int guess_count = 0;
-
-    for (int i = 0; i < state.card_count; i++) {
-        if (state.grid[i].revealed) {
-            guesses[guess_count] = i;
-            guess_count++;
-            if (guess_count > 3) {
-                LOG("ERROR: More than 3 guesses!");
-                return false;
-            }
-        }
+static void ui_label(char *text, Vector2 pos, float size, Alignment align_x, Alignment align_y) {
+    Vector2 text_size = MeasureTextEx(font, text, size, 1);
+    Vector2 origin = {0, 0};
+    switch (align_x) {
+        case ALIGN_START: break;
+        case ALIGN_MID: origin.x = text_size.x / 2.0f; break;
+        case ALIGN_END: origin.x = text_size.x; break;
+        default: break;
+    }
+    switch (align_y) {
+        case ALIGN_START: break;
+        case ALIGN_MID: origin.y = text_size.y / 2.0f; break;
+        case ALIGN_END: origin.y = text_size.y; break;
+        default: break;
     }
 
-    bool all_match = true;
-    for (int i = 0; i < 3; i++) {
-        if (state.grid[guesses[i]].combo_id != state.grid[guesses[0]].combo_id) {
-            all_match = false;
-        }
+    /*DrawRectanglePro((Rectangle){pos.x, pos.y, text_size.x, text_size.y}, origin, 0, BLUE);*/
+
+    DrawTextPro(font, text, pos, origin, 0, size, 1, COLOR_DARK);
+}
+
+static bool ui_button(char *text, Vector2 pos, float size, Alignment align_x, Alignment align_y) {
+
+    Vector2 text_size = MeasureTextEx(font, text, size, 1);
+    float border = 4.0f;
+    float margin = 8.0f;
+    Rectangle outer_rect = {pos.x, pos.y, text_size.x + margin * 2.0f, text_size.y + margin * 2.0f};
+    Rectangle inner_rect = {outer_rect.x + border, outer_rect.y + border, outer_rect.width - border * 2.0f, outer_rect.height - border * 2.0f};
+
+    Vector2 text_pos = {pos.x + margin, pos.y + margin};
+    Vector2 origin = {0, 0};
+    switch (align_x) {
+        case ALIGN_START: break;
+        case ALIGN_MID: origin.x = outer_rect.width / 2.0f; break;
+        case ALIGN_END: origin.x = outer_rect.width; break;
+        default: break;
+    }
+    switch (align_y) {
+        case ALIGN_START: break;
+        case ALIGN_MID: origin.y = outer_rect.height / 2.0f; break;
+        case ALIGN_END: origin.y = outer_rect.height; break;
+        default: break;
     }
 
-    if (all_match) {
-        for (int i = 0; i < 3; i++) {
-            state.grid[guesses[i]].solved = true;
+    Vector2 mouse = GetMousePosition();
+    Rectangle interaction_rect = {outer_rect.x - origin.x, outer_rect.y - origin.y, outer_rect.width, outer_rect.height};
+
+    bool hovered = CheckCollisionPointRec(mouse, interaction_rect);
+    bool active = hovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    bool clicked = hovered && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+
+    Color fill_color = COLOR_BG;
+    Color text_color = COLOR_DARK;
+    if (active) {
+        fill_color = COLOR_DARK;
+        text_color = COLOR_LIGHT;
+    } else if (hovered) {
+        fill_color = COLOR_LIGHT;
+    }
+
+    DrawRectanglePro(outer_rect, origin, 0, text_color);
+    DrawRectanglePro(inner_rect, origin, 0, fill_color);
+    DrawTextPro(font, text, text_pos, origin, 0, size, 1, text_color);
+
+    return clicked;
+}
+
+static void draw_ui() {
+
+    Vector2 origin = {12, 12};
+    DrawTexturePro(texture, BORDER_CORNER, (Rectangle){24, 24, 24, 24}, origin, 0, WHITE);
+    DrawTexturePro(texture, BORDER_CORNER, (Rectangle){menu_width - 24, 24, 24, 24}, origin, 0, WHITE);
+    DrawTexturePro(texture, BORDER_CORNER, (Rectangle){24, screen_height - 24, 24, 24}, origin, 0, WHITE);
+    DrawTexturePro(texture, BORDER_CORNER, (Rectangle){menu_width - 24, screen_height - 24, 24, 24}, origin, 0, WHITE);
+
+    origin = (Vector2){12, (screen_height - 36*2) / 2};
+
+    DrawTexturePro(texture, BORDER_Y, (Rectangle){24, screen_height / 2, 24, screen_height - 36*2}, origin , 0, WHITE);
+    DrawTexturePro(texture, BORDER_Y, (Rectangle){menu_width - 24, screen_height / 2, 24, screen_height - 36*2}, origin , 0, WHITE);
+
+    origin = (Vector2){(menu_width - 36*2) / 2, 12};
+    DrawTexturePro(texture, BORDER_X, (Rectangle){menu_width / 2, 24, menu_width - 36*2, 24}, origin , 0, WHITE);
+    DrawTexturePro(texture, BORDER_X, (Rectangle){menu_width / 2, screen_height - 24, menu_width - 36*2, 24}, origin , 0, WHITE);
+
+    Vector2 mouse = GetMousePosition();
+
+    Vector2 title_pos = {menu_width / 2, 48};
+    ui_label("Puzzle", title_pos, 48, ALIGN_MID, ALIGN_START);
+    title_pos = (Vector2){menu_width / 2, 96};
+    ui_label("Matcher", title_pos, 48, ALIGN_MID, ALIGN_START);
+
+    Vector2 attempts_pos = {48, screen_height - 96 - 12};
+    ui_label(TextFormat("Attempts: %d", state.attempts), attempts_pos, 36, ALIGN_START, ALIGN_END);
+
+    Vector2 new_position = {48, screen_height - 48};
+    if (!state.showing_new_buttons) {
+        if (ui_button("New", new_position, 36, ALIGN_START, ALIGN_END)) {
+            state.showing_new_buttons = true;
         }
     } else {
-        for (int i = 0; i < 3; i++) {
-            state.grid[guesses[i]].wrong = true;
+        if (ui_button("Cancel", new_position, 36, ALIGN_START, ALIGN_END)) {
+            state.showing_new_buttons = false;
+        }
+        Vector2 pos = {184, screen_height - 48};
+        if (ui_button("3x3", pos, 36.0f, ALIGN_START, ALIGN_END)) {
+            init_grid(3, 3);
+        }
+        pos.x += 80;
+        if (ui_button("4x3", pos, 36.0f, ALIGN_START, ALIGN_END)) {
+            init_grid(4, 3);
+        }
+        pos.x += 80;
+        if (ui_button("6x4", pos, 36.0f, ALIGN_START, ALIGN_END)) {
+            init_grid(6, 4);
+        }
+        pos.x += 80;
+        if (ui_button("6x6", pos, 36.0f, ALIGN_START, ALIGN_END)) {
+            init_grid(6, 6);
         }
     }
 
-    return all_match;
+    if (state.has_won) {
+        Vector2 win_pos = {48, screen_height / 2};
+        ui_label("You won! Press \"New\"\nto try again with a\nlarger board, or try\nto win in fewer\nattempts.", win_pos, 24, ALIGN_START, ALIGN_MID);
+    }
 }
 
 static void draw_grid() {
-
     Vector2 mouse = GetMousePosition();
 
     bool in_revealed = false;
@@ -372,23 +481,7 @@ static void draw_grid() {
         }
     }
 
-    draw_text_texture(TITLE, (Vector2){10.0f, 10.0f}, 3.0f, false, false);
-    draw_text_texture(ATTEMPTS, (Vector2){10.0f, 200.0f}, 2.0f, false, false);
-    draw_number(state.attempts, (Vector2){10.0f + ATTEMPTS.width * 2.0f + 10.0f, 200.0f + 4.0f}, 2.0f);
 
-    Rectangle outer = {10, screen_height - NEW.height * 3 - 30, NEW.width * 3 + 20, NEW.height * 3 + 20};
-    Rectangle inner = {15, screen_height - NEW.height * 3 - 25, NEW.width * 3 + 10, NEW.height * 3 + 10};
-
-    DrawRectangleRec(outer, BLACK);
-    if (CheckCollisionPointRec(mouse, outer)) {
-        DrawRectangleRec(inner, WHITE);
-        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            init_grid(6, 6);
-        }
-    } else {
-        DrawRectangleRec(inner, GRAY);
-    }
-    draw_text_texture(NEW, (Vector2){20, screen_height - NEW.height * 3.0f - 20}, 3.0f, false, false);
 }
 
 int main(void) {
@@ -402,8 +495,8 @@ int main(void) {
     SetExitKey(KEY_Q);
     
     texture = LoadTexture("resources/puzzle.png");
-    texture_text = LoadTexture("resources/text.png");
-    init_grid(6, 6);
+    font = LoadFont("resources/november.ttf");
+    init_grid(3, 3);
 
     // Render texture to draw full screen, enables screen scaling
     // NOTE: If screen is scaled, mouse input should be scaled proportionally
@@ -449,35 +542,17 @@ void update(void) {
     // it could be useful for scaling or further shader postprocessing
     BeginTextureMode(target);
 
-    ClearBackground(GRAY);
-
-    /*
-     * 3x3 = 9
-     * 3x4 = 12
-     * 4x6 = 24
-     * 6x6 = 36
-     */
-    /*if (IsKeyPressed(KEY_UP) && state.grid_height < 12) {*/
-    /*    init_grid(state.grid_width, state.grid_height + 1);*/
-    /*}*/
-    /*if (IsKeyPressed(KEY_DOWN) && state.grid_height > 1) {*/
-    /*    init_grid(state.grid_width, state.grid_height - 1);*/
-    /*}*/
-    /*if (IsKeyPressed(KEY_LEFT) && state.grid_width > 1) {*/
-    /*    init_grid(state.grid_width - 1, state.grid_height);*/
-    /*}*/
-    /*if (IsKeyPressed(KEY_RIGHT) && state.grid_width < 12) {*/
-    /*    init_grid(state.grid_width + 1, state.grid_height);*/
-    /*}*/
+    ClearBackground(COLOR_BG);
 
     draw_grid();
+    draw_ui();
         
     EndTextureMode();
     
     // Render to screen (main framebuffer)
     BeginDrawing();
 
-    ClearBackground(colors[0]);
+    ClearBackground(COLOR_BG);
     DrawTexturePro(target.texture, (Rectangle){ 0, 0, (float)target.texture.width, -(float)target.texture.height }, (Rectangle){ 0, 0, (float)target.texture.width, (float)target.texture.height }, (Vector2){ 0, 0 }, 0.0f, WHITE);
 
     EndDrawing();
