@@ -236,7 +236,7 @@ static void init_grid(int grid_width, int grid_height) {
 
     state.card_size = min(
         (float)((screen_width - (int)menu_width - 10) / grid_width / 32 * 32),
-        (float)((screen_height - 10) / grid_height / 32 * 32),
+        (float)((screen_height - 10) / grid_height / 32 * 32)
     );
 
     state.card_spacing = state.card_size + state.card_size / 8.0f;
