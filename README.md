@@ -1,6 +1,6 @@
 # Puzzle Matcher
 
-![Puzzle Matcher](screenshots/screenshot000.png "Puzzle Matcher")
+![Puzzle Matcher](screenshots/screenshot00.png "Puzzle Matcher")
 
 ### Description
 
