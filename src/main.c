@@ -235,8 +235,8 @@ static void init_grid(int grid_width, int grid_height) {
     state.grid_height = grid_height;
 
     state.card_size = min(
+        (float)((screen_width - (int)menu_width - 10) / grid_width / 32 * 32),
         (float)((screen_height - 10) / grid_height / 32 * 32),
-        (float)((screen_height - 10) / grid_width / 32 * 32), // yes, screen_height
     );
 
     state.card_spacing = state.card_size + state.card_size / 8.0f;
@@ -314,7 +314,7 @@ static void reset_cards() {
     state.revealed_count = 0;
 }
 
-static void ui_label(char *text, Vector2 pos, float size, Alignment align_x, Alignment align_y) {
+static void ui_label(const char *text, Vector2 pos, float size, Alignment align_x, Alignment align_y) {
     Vector2 text_size = MeasureTextEx(font, text, size, 1);
     Vector2 origin = {0, 0};
     switch (align_x) {
@@ -397,8 +397,6 @@ static void draw_ui() {
     origin = (Vector2){(menu_width - 36*2) / 2, 12};
     DrawTexturePro(texture, BORDER_X, (Rectangle){menu_width / 2, 24, menu_width - 36*2, 24}, origin , 0, WHITE);
     DrawTexturePro(texture, BORDER_X, (Rectangle){menu_width / 2, screen_height - 24, menu_width - 36*2, 24}, origin , 0, WHITE);
-
-    Vector2 mouse = GetMousePosition();
 
     Vector2 title_pos = {menu_width / 2, 48};
     ui_label("Puzzle", title_pos, 48, ALIGN_MID, ALIGN_START);
