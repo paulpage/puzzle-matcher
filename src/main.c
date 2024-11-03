@@ -44,6 +44,7 @@ typedef struct State {
     Card *grid;
     Rectangle *piece_combos;
     Texture2D texture;
+    Texture2D texture_text;
     int revealed_count;
     int revealed_ids[3];
     int attempts;
@@ -63,11 +64,14 @@ typedef struct State {
 //----------------------------------------------------------------------------------
 static const int screen_width = 800;
 static const int screen_height = 450;
+static const float menu_width = 350.0f;
 
 #define MAX_COLORS 8
 static Color colors[MAX_COLORS];
 
 static State state = {0};
+static Texture2D texture;
+static Texture2D texture_text;
 
 static RenderTexture2D target = { 0 };  // Render texture to render our game
 
@@ -88,10 +92,74 @@ static RenderTexture2D target = { 0 };  // Render texture to render our game
 #define CARD_0      ((Rectangle){ SCL*2, SCL*2, SCL, SCL})
 #define CARD_1      ((Rectangle){ SCL*3, SCL*2, SCL, SCL})
 
+#define TITLE ((Rectangle){ 0, 0, 79, 39 })
+#define ATTEMPTS ((Rectangle){ 0, 40, 84, 24 })
+#define NEW ((Rectangle){ 0, 110, 37, 18 })
+#define LETTER_X ((Rectangle){ 48, 112, 11, 10 })
+#define NUM_0 ((Rectangle){ 0,  64, 11, 16 })
+#define NUM_1 ((Rectangle){ 11, 64, 7,  16 })
+#define NUM_2 ((Rectangle){ 18, 64, 11, 16 })
+#define NUM_3 ((Rectangle){ 29, 64, 11, 16 })
+#define NUM_4 ((Rectangle){ 40, 64, 11, 16 })
+#define NUM_5 ((Rectangle){ 51, 64, 11, 16 })
+#define NUM_6 ((Rectangle){ 62, 64, 11, 16 })
+#define NUM_7 ((Rectangle){ 73, 64, 11, 16 })
+#define NUM_8 ((Rectangle){ 84, 64, 11, 16 })
+#define NUM_9 ((Rectangle){ 95, 64, 11, 16 })
+
+#define TEXT_HEIGHT 23
+#define NUM_HEIGHT 16
+
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 static void update(void); // Update and Draw one frame
+
+
+void draw_text_texture(Rectangle src, Vector2 pos, float scale, bool center_x, bool center_y) {
+    Rectangle dst;
+    dst.x = pos.x;
+    dst.y = pos.y;
+    dst.width = src.width * scale;
+    dst.height = src.height * scale;
+    Vector2 origin = {0, 0};
+    if (center_x) {
+        origin.x = src.width / 2.0f;
+    }
+    if (center_y) {
+        origin.y = src.height / 2.0f;
+    }
+    DrawTexturePro(texture_text, src, dst, origin, 0.0f, WHITE);
+}
+
+void draw_number(int number, Vector2 pos, float scale) {
+    char str[32];
+    sprintf(str, "%d", number);
+    
+    float advance = 0;
+    
+    for (int i = 0; str[i] != '\0'; i++) {
+        int digit = str[i] - '0';
+        Rectangle src;
+        
+        switch (digit) {
+            case 0: src = NUM_0; break;
+            case 1: src = NUM_1; break;
+            case 2: src = NUM_2; break;
+            case 3: src = NUM_3; break;
+            case 4: src = NUM_4; break;
+            case 5: src = NUM_5; break;
+            case 6: src = NUM_6; break;
+            case 7: src = NUM_7; break;
+            case 8: src = NUM_8; break;
+            case 9: src = NUM_9; break;
+            default: continue; // Skip non-digit characters
+        }
+        
+        draw_text_texture(src, (Vector2){pos.x + advance, pos.y}, scale, false, false);
+        advance += src.width * scale;
+    }
+}
 
 static void shuffle(Card *array, int n) {
     if (n > 1) {
@@ -128,10 +196,10 @@ static void draw_card(Card *card, Rectangle dst) {
     }
 
     if (!card->revealed && !card->solved) {
-        DrawTexturePro(state.texture, CARD_0, dst, origin, r, WHITE);
+        DrawTexturePro(texture, CARD_0, dst, origin, r, WHITE);
     } else {
-        DrawTexturePro(state.texture, CARD_1, dst, origin, r, WHITE);
-        DrawTexturePro(state.texture, card->texcoords, dst, origin, r, WHITE);
+        DrawTexturePro(texture, CARD_1, dst, origin, r, WHITE);
+        DrawTexturePro(texture, card->texcoords, dst, origin, r, WHITE);
     }
 
     /*DrawText(TextFormat("%d", card->combo_id), dst.x - origin.x, dst.y - origin.y, 20, BLACK);*/
@@ -141,6 +209,8 @@ static void draw_card(Card *card, Rectangle dst) {
 }
 
 static void init_grid(int grid_width, int grid_height) {
+
+    memset(&state, 0, sizeof(State));
 
     state.grid_width = grid_width;
     state.grid_height = grid_height;
@@ -202,10 +272,9 @@ static void init_grid(int grid_width, int grid_height) {
             int i = y * state.grid_width + x;
             Card *card = &state.grid[i];
 
-            int p = y * state.grid_width + x;
-            int piece = p % 3;
-            int rotation = (p / 3) % 4;
-            int combo = (p / 12) % 3;
+            int piece = i % 3;
+            int rotation = (i / 3) % 4;
+            int combo = (i / 12) % 3;
             int combo_id = rotation * 8 + combo;
             int ii = combo * 3 + piece;
             card->texcoords = state.piece_combos[ii];
@@ -276,11 +345,12 @@ static void draw_grid() {
     }
 
     int padding = 2;
-    for (int y = 0; y < state.grid_width; y++) {
-        for (int x = 0; x < state.grid_height; x++) {
+    for (int y = 0; y < state.grid_height; y++) {
+        for (int x = 0; x < state.grid_width; x++) {
 
             int i = y * state.grid_width + x;
             Card *card = &state.grid[i];
+            // TODO borders are incorrect without margin, why?
             float margin = (state.card_spacing - state.card_size) / 2.0f;
             Rectangle rect = (Rectangle){x * state.card_spacing + state.grid_offset.x, y * state.card_spacing + state.grid_offset.y, state.card_spacing, state.card_spacing};
             Rectangle tex_rect = (Rectangle){x * state.card_spacing + margin, y * state.card_spacing + margin, state.card_size, state.card_size};
@@ -303,7 +373,23 @@ static void draw_grid() {
         }
     }
 
-    DrawText(TextFormat("Attempts: %d", state.attempts), 0, 0, 20, BLACK);
+    draw_text_texture(TITLE, (Vector2){10.0f, 10.0f}, 3.0f, false, false);
+    draw_text_texture(ATTEMPTS, (Vector2){10.0f, 200.0f}, 2.0f, false, false);
+    draw_number(state.attempts, (Vector2){10.0f + ATTEMPTS.width * 2.0f + 10.0f, 200.0f + 4.0f}, 2.0f);
+
+    Rectangle outer = {10, screen_height - NEW.height * 3 - 30, NEW.width * 3 + 20, NEW.height * 3 + 20};
+    Rectangle inner = {15, screen_height - NEW.height * 3 - 25, NEW.width * 3 + 10, NEW.height * 3 + 10};
+
+    DrawRectangleRec(outer, BLACK);
+    if (CheckCollisionPointRec(mouse, outer)) {
+        DrawRectangleRec(inner, WHITE);
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            init_grid(6, 6);
+        }
+    } else {
+        DrawRectangleRec(inner, GRAY);
+    }
+    draw_text_texture(NEW, (Vector2){20, screen_height - NEW.height * 3.0f - 20}, 3.0f, false, false);
 }
 
 int main(void) {
@@ -314,19 +400,17 @@ int main(void) {
     srand(time(NULL));
 
     InitWindow(screen_width, screen_height, "Puzzle Matcher");
+    SetExitKey(KEY_Q);
     
-    // TODO: Load resources / Initialize variables at this point
-    state.texture = LoadTexture("resources/puzzle.png");
-    init_grid(3, 3);
+    texture = LoadTexture("resources/puzzle.png");
+    texture_text = LoadTexture("resources/text.png");
+    init_grid(6, 6);
 
-    
-    
     // Render texture to draw full screen, enables screen scaling
     // NOTE: If screen is scaled, mouse input should be scaled proportionally
     target = LoadRenderTexture(screen_width, screen_height);
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
 
-    SetExitKey(KEY_Q);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop(update, 60, 1);
@@ -369,6 +453,12 @@ void update(void) {
 
     ClearBackground(GRAY);
 
+    /*
+     * 3x3 = 9
+     * 3x4 = 12
+     * 4x6 = 24
+     * 6x6 = 36
+     */
     if (IsKeyPressed(KEY_UP) && state.grid_height < 12) {
         init_grid(state.grid_width, state.grid_height + 1);
     }
@@ -383,16 +473,8 @@ void update(void) {
     }
 
     draw_grid();
-    float texw = (float)state.texture.width;
-    float texh = (float)state.texture.height;
-    /*DrawTexturePro(*/
-    /*        state.texture,*/
-    /*        (Rectangle){0, 0, texw, texh},*/
-    /*        (Rectangle){texw, texh, texw*2.0f, texh*2.0f},*/
-    /*        (Vector2){texw, texh},*/
-    /*        90.0f,*/
-    /*        WHITE);*/
-
+    float texw = (float)texture.width;
+    float texh = (float)texture.height;
         
     EndTextureMode();
     
@@ -401,10 +483,6 @@ void update(void) {
 
     ClearBackground(colors[0]);
     DrawTexturePro(target.texture, (Rectangle){ 0, 0, (float)target.texture.width, -(float)target.texture.height }, (Rectangle){ 0, 0, (float)target.texture.width, (float)target.texture.height }, (Vector2){ 0, 0 }, 0.0f, WHITE);
-
-    /*DrawText(TextFormat("mouse=(%f, %f)", mouse.x, mouse.y), 0, 0, 20, colors[1]);*/
-    /*DrawText(TextFormat("offset=(%f, %f)", state.offset.x, state.offset.y), 0, 25, 20, colors[1]);*/
-    /*DrawText(TextFormat("presspos=(%f, %f)", state.mouse_press_pos.x, state.mouse_press_pos.y), 0, 50, 20, colors[1]);*/
 
     EndDrawing();
 }
