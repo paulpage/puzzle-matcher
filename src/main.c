@@ -196,7 +196,7 @@ static void draw_card(Card *card, Rectangle dst) {
     }
 
     if (!card->revealed && !card->solved) {
-        DrawTexturePro(texture, CARD_0, dst, origin, r, WHITE);
+        DrawTexturePro(texture, CARD_0, dst, origin, 0, WHITE);
     } else {
         DrawTexturePro(texture, CARD_1, dst, origin, r, WHITE);
         DrawTexturePro(texture, card->texcoords, dst, origin, r, WHITE);
