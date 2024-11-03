@@ -58,6 +58,7 @@ typedef struct State {
     float card_size;
     bool showing_new_buttons;
     bool has_won;
+    float scale_factor;
 } State;
 
 // Includes padding; card texture will have a blank border
@@ -65,9 +66,9 @@ typedef struct State {
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-static const int screen_width = 800;
-static const int screen_height = 450;
-static const float menu_width = 350.0f;
+static const int screen_width = 850;
+static const int screen_height = 500;
+static const float menu_width = 400.0f;
 
 #define COLOR_BG ((Color){0x9b, 0x99, 0xb6, 0xff})
 #define COLOR_DARK ((Color){0x1b, 0x20, 0x1f, 0xff})
@@ -359,6 +360,9 @@ static bool ui_button(char *text, Vector2 pos, float size, Alignment align_x, Al
     }
 
     Vector2 mouse = GetMousePosition();
+    mouse.x /= state.scale_factor;
+    mouse.y /= state.scale_factor;
+
     Rectangle interaction_rect = {outer_rect.x - origin.x, outer_rect.y - origin.y, outer_rect.width, outer_rect.height};
 
     bool hovered = CheckCollisionPointRec(mouse, interaction_rect);
@@ -441,6 +445,8 @@ static void draw_ui() {
 
 static void draw_grid() {
     Vector2 mouse = GetMousePosition();
+    mouse.x /= state.scale_factor;
+    mouse.y /= state.scale_factor;
 
     bool in_revealed = false;
     if (state.revealed_count >= 3) {
@@ -490,6 +496,7 @@ int main(void) {
     srand(time(NULL));
 
     InitWindow(screen_width, screen_height, "Puzzle Matcher");
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetExitKey(KEY_Q);
     
     texture = LoadTexture("resources/puzzle.png");
@@ -546,12 +553,17 @@ void update(void) {
     draw_ui();
         
     EndTextureMode();
+
+    float scale_width = (float)GetScreenWidth() / screen_width;
+    float scale_height = (float)GetScreenHeight() / screen_height;
+    state.scale_factor = min(scale_width, scale_height);
+
     
     // Render to screen (main framebuffer)
     BeginDrawing();
 
     ClearBackground(COLOR_BG);
-    DrawTexturePro(target.texture, (Rectangle){ 0, 0, (float)target.texture.width, -(float)target.texture.height }, (Rectangle){ 0, 0, (float)target.texture.width, (float)target.texture.height }, (Vector2){ 0, 0 }, 0.0f, WHITE);
+    DrawTexturePro(target.texture, (Rectangle){ 0, 0, (float)target.texture.width, -(float)target.texture.height }, (Rectangle){ 0, 0, (float)target.texture.width * state.scale_factor, (float)target.texture.height * state.scale_factor }, (Vector2){ 0, 0 }, 0.0f, WHITE);
 
     EndDrawing();
 }
