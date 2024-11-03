@@ -554,10 +554,9 @@ void update(void) {
         
     EndTextureMode();
 
-    float scale_width = (float)GetScreenWidth() / screen_width;
-    float scale_height = (float)GetScreenHeight() / screen_height;
-    state.scale_factor = min(scale_width, scale_height);
-
+    float scale_x = min((float)GetScreenWidth(), screen_width) / screen_width;
+    float scale_y = min((float)GetScreenHeight(), screen_height) / screen_height;
+    state.scale_factor = min(scale_x, scale_y);
     
     // Render to screen (main framebuffer)
     BeginDrawing();
