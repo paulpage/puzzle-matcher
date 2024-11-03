@@ -306,7 +306,7 @@ static bool check_solve() {
             guess_count++;
             if (guess_count > 3) {
                 LOG("ERROR: More than 3 guesses!");
-                return;
+                return false;
             }
         }
     }
@@ -344,7 +344,6 @@ static void draw_grid() {
         }
     }
 
-    int padding = 2;
     for (int y = 0; y < state.grid_height; y++) {
         for (int x = 0; x < state.grid_width; x++) {
 
@@ -444,7 +443,6 @@ Vector2 vec2_add(Vector2 a, Vector2 b) {
 //--------------------------------------------------------------------------------------------
 void update(void) {
     // Update
-    Vector2 mouse = GetMousePosition();
 
     // Draw
     // Render game screen to a texture, 
@@ -459,22 +457,20 @@ void update(void) {
      * 4x6 = 24
      * 6x6 = 36
      */
-    if (IsKeyPressed(KEY_UP) && state.grid_height < 12) {
-        init_grid(state.grid_width, state.grid_height + 1);
-    }
-    if (IsKeyPressed(KEY_DOWN) && state.grid_height > 1) {
-        init_grid(state.grid_width, state.grid_height - 1);
-    }
-    if (IsKeyPressed(KEY_LEFT) && state.grid_width > 1) {
-        init_grid(state.grid_width - 1, state.grid_height);
-    }
-    if (IsKeyPressed(KEY_RIGHT) && state.grid_width < 12) {
-        init_grid(state.grid_width + 1, state.grid_height);
-    }
+    /*if (IsKeyPressed(KEY_UP) && state.grid_height < 12) {*/
+    /*    init_grid(state.grid_width, state.grid_height + 1);*/
+    /*}*/
+    /*if (IsKeyPressed(KEY_DOWN) && state.grid_height > 1) {*/
+    /*    init_grid(state.grid_width, state.grid_height - 1);*/
+    /*}*/
+    /*if (IsKeyPressed(KEY_LEFT) && state.grid_width > 1) {*/
+    /*    init_grid(state.grid_width - 1, state.grid_height);*/
+    /*}*/
+    /*if (IsKeyPressed(KEY_RIGHT) && state.grid_width < 12) {*/
+    /*    init_grid(state.grid_width + 1, state.grid_height);*/
+    /*}*/
 
     draw_grid();
-    float texw = (float)texture.width;
-    float texh = (float)texture.height;
         
     EndTextureMode();
     
