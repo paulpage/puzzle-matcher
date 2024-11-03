@@ -1,18 +1,18 @@
-# Jam Game
+# Puzzle Matcher
 
-![Jam Game](screenshots/screenshot000.png "Jam Game")
+![Puzzle Matcher](screenshots/screenshot000.png "Puzzle Matcher")
 
 ### Description
 
-This is a game I made for the RayLib NEXT Game Jam in October 2024.
+This is a game I made for the RayLib NEXT Game Jam in October/November 2024.
 
 ### Features
 
-TODO
+Flip cards to reveal puzzle pieces in groups of three. Try to remember the cards you flipped, and keep flipping until you get three connecting puzzle pieces. Connect all the puzzle pieces to win!
 
 ### Controls
 
-TODO
+Mouse/Touch: Flip cards, navigate UI
 
 ### Screenshots
 
