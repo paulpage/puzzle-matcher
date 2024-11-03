@@ -66,9 +66,9 @@ typedef struct State {
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-static const int screen_width = 850;
-static const int screen_height = 500;
-static const float menu_width = 400.0f;
+static const int screen_width = 800;
+static const int screen_height = 450;
+static const float menu_width = 350.0f;
 
 #define COLOR_BG ((Color){0x9b, 0x99, 0xb6, 0xff})
 #define COLOR_DARK ((Color){0x1b, 0x20, 0x1f, 0xff})
@@ -554,8 +554,8 @@ void update(void) {
         
     EndTextureMode();
 
-    float scale_x = min((float)GetScreenWidth(), screen_width) / screen_width;
-    float scale_y = min((float)GetScreenHeight(), screen_height) / screen_height;
+    float scale_x = (float)GetScreenWidth() / screen_width;
+    float scale_y = (float)GetScreenHeight() / screen_height;
     state.scale_factor = min(scale_x, scale_y);
     
     // Render to screen (main framebuffer)
