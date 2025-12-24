@@ -1,0 +1,12 @@
+- [X] UI: New button
+- [X] UI: Menu (with x) to select level when you press new button
+- [X] UI: Position elements on the screen
+- [X] Feat: Win condition
+- [X] Polish: Align pixel grid for hover over cards
+- [X] Polish: Adjust color scheme
+- [ ] Polish: Allow flipping new card immediately?
+- [ ] Release: Fix CI builds
+- [ ] Release: Test Windows build
+- [ ] Release: Test WASM build
+- [ ] Release: Test Linux build
+- [X] Bug: Don't draw unflipped cards rotated
