@@ -264,7 +264,7 @@ static void init_grid(int grid_width, int grid_height) {
     state.piece_combos[2] = PIECE_SM_11;
     state.piece_combos[3] = PIECE_LG_00;
     state.piece_combos[4] = PIECE_MD_11;
-    state.piece_combos[5] = PIECE_SM_10;
+    state.piece_combos[5] = PIECE_SM_01;
     state.piece_combos[6] = PIECE_LG_01;
     state.piece_combos[7] = PIECE_MD_00;
     state.piece_combos[8] = PIECE_SM_11;
